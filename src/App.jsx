@@ -121,7 +121,16 @@ export default function App() {
   const submitReport = async ({ tag, note, emoji }) => {
     setBusy(true)
     try {
-      const { merged, checkpoint } = await backend.report({ lat: reportAt.lat, lng: reportAt.lng, tag, note, emoji })
+      const { merged, already, checkpoint } = await backend.report({ lat: reportAt.lat, lng: reportAt.lng, tag, note, emoji })
+      if (already) {
+        // Nothing changed server-side; just show them the pin they already have.
+        say(t(already === 'reported' ? 'alreadyReported' : 'alreadyConfirmed'))
+        setReportAt(null)
+        setSearchPin(null)
+        setSelectedId(checkpoint.id)
+        setFlyTarget({ lat: checkpoint.lat, lng: checkpoint.lng, k: Date.now() })
+        return true
+      }
       markSeen(checkpoint.id)
       setMyVotes((v) => ({ ...v, [checkpoint.id]: 'still_there' }))
       say(merged ? t('merged') : t('reported'))

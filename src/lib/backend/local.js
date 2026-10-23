@@ -104,10 +104,6 @@ export function createLocalBackend() {
     async report({ lat, lng, tag = 'general', note, emoji }) {
       const profile = getProfile()
       if (!profile) throw new AppError('profile_required')
-      const last = profile.last_report_at ? new Date(profile.last_report_at).getTime() : 0
-      if (Date.now() - last < RATE_LIMIT_MS) {
-        throw new AppError('rate_limited', { waitSec: Math.ceil((last + RATE_LIMIT_MS - Date.now()) / 1000) })
-      }
       note = (note || '').trim() || null
       if (note && note.length > NOTE_MAX) throw new AppError('note_too_long')
 
@@ -119,12 +115,24 @@ export function createLocalBackend() {
         .filter(({ d }) => d <= MERGE_RADIUS_M)
         .sort((a, b) => a.d - b.d)[0]
 
+      // Mirrors report_checkpoint(): re-reporting your own / already-confirmed pin is a no-op.
+      const prev = near?.cp.votes?.[userId]
+      if (near && (prev === 'still_there' || (!prev && near.cp.created_by === userId))) {
+        return { merged: true, already: near.cp.created_by === userId ? 'reported' : 'confirmed', checkpoint: near.cp }
+      }
+
+      const last = profile.last_report_at ? new Date(profile.last_report_at).getTime() : 0
+      if (Date.now() - last < RATE_LIMIT_MS) {
+        throw new AppError('rate_limited', { waitSec: Math.ceil((last + RATE_LIMIT_MS - Date.now()) / 1000) })
+      }
+
       const nowIso = new Date().toISOString()
       if (near) {
         near.cp.votes = { ...near.cp.votes, [userId]: 'still_there' }
         recount(near.cp)
         writeAll(list)
-        bumpProfile((p) => ({ last_report_at: nowIso, points: p.points + 5 }))
+        const bonus = !prev && near.cp.created_by !== userId ? 5 : 0
+        bumpProfile((p) => ({ last_report_at: nowIso, points: p.points + bonus }))
         return { merged: true, checkpoint: near.cp }
       }
 

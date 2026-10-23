@@ -30,6 +30,8 @@ const en = {
   away: '{d} away',
   reported: 'Pin dropped! +10 pts 🫡',
   merged: 'Someone already spotted it — you confirmed it +5 👀',
+  alreadyReported: 'You already dropped this one 📍 — it\'s still live',
+  alreadyConfirmed: 'You already confirmed this one 👀 — thanks!',
   voted: 'Vote counted, thanks bestie',
 }
 
@@ -62,6 +64,8 @@ const hi = {
   away: '{d} door',
   reported: 'Pin gaad diya! +10 pts 🫡',
   merged: 'Pehle se kisi ne daala tha — confirm ho gaya +5 👀',
+  alreadyReported: 'Ye pin toh tune hi daala hai bhai 📍',
+  alreadyConfirmed: 'Tu pehle hi confirm kar chuka hai 👀',
   voted: 'Vote gaya, shukriya bhai',
 }
 
@@ -94,6 +98,8 @@ const dakhni = {
   away: '{d} dur',
   reported: 'Pin daal diye! +10 pts 🫡',
   merged: 'Pehle se koi daale the — confirm hogaya +5 👀',
+  alreadyReported: 'Ye pin tum hi daale mamu 📍',
+  alreadyConfirmed: 'Tum pehle hi confirm kardiye mamu 👀',
   voted: 'Vote hogaya, shukriya mamu',
 }
 
