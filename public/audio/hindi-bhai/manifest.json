@@ -1,0 +1,14 @@
+{
+  "name": "Hindi Bhai",
+  "lang": "hi-IN",
+  "clips": [
+    { "file": "01-uturn.mp3", "text": "Bhai U-turn maar le" },
+    { "file": "02-mood.mp3", "text": "Aage naaka hai, mood kharab mat kar" },
+    { "file": "03-rasta.mp3", "text": "Rasta badal, kismat badal" },
+    { "file": "04-gali.mp3", "text": "Challan se bachna hai toh gali pakad" },
+    { "file": "05-boss.mp3", "text": "Ye route nahi chalega boss" },
+    { "file": "06-mummy.mp3", "text": "Mummy ne kaha tha helmet pehen ke jaana" },
+    { "file": "07-josh.mp3", "text": "Aaj ka plan: side road, full josh" },
+    { "file": "08-spotted.mp3", "text": "Naaka spotted bhai, dhyaan se" }
+  ]
+}

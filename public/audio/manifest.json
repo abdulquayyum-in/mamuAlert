@@ -1,0 +1,9 @@
+{
+  "packs": [
+    { "id": "beep", "name": "Classic Beep", "type": "synth" },
+    { "id": "meme", "name": "Meme SFX", "type": "synth" },
+    { "id": "hindi-bhai", "name": "Hindi Bhai", "type": "voice", "lang": "hi-IN" },
+    { "id": "hyderabadi-mamu", "name": "Hyderabadi Mamu", "type": "voice", "lang": "hi-IN" },
+    { "id": "silent", "name": "Silent", "type": "silent" }
+  ]
+}

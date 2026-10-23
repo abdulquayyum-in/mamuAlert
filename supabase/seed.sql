@@ -1,0 +1,2 @@
+-- Nothing to seed: profiles are created by real (anonymous) auth users.
+-- For local testing, use the in-app "Spawn demo pins" button in offline demo mode.

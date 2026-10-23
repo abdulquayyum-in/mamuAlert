@@ -1,0 +1,14 @@
+{
+  "name": "Hyderabadi Mamu",
+  "lang": "hi-IN",
+  "clips": [
+    { "file": "01-mamu.mp3", "text": "Kya re mamu, aage naaka hai" },
+    { "file": "02-nakko.mp3", "text": "Nakko jao udhar, baigan ho jaata" },
+    { "file": "03-hau.mp3", "text": "Hau bhai, dusra rasta pakdo" },
+    { "file": "04-khatarnaak.mp3", "text": "Ek dum khatarnaak scene hai aage" },
+    { "file": "05-hallu.mp3", "text": "Hallu hallu chalao, police khade" },
+    { "file": "06-kaiku.mp3", "text": "Kaiku tension leta, side gali hai na" },
+    { "file": "07-helmet.mp3", "text": "Mamu, helmet kidhar hai tera?" },
+    { "file": "08-dikha.mp3", "text": "Naaka dikha re mamu" }
+  ]
+}
