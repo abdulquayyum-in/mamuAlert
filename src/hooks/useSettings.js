@@ -11,6 +11,7 @@ const DEFAULTS = {
   notify: false,
   seenDriveReminder: false,
   walkMode: false,
+  tourDone: false,
 }
 
 export function useSettings() {

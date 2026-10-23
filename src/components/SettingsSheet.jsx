@@ -25,7 +25,7 @@ function Chips({ options, value, onChange }) {
   )
 }
 
-export default function SettingsSheet({ open, onClose, settings, update, profile, onEditProfile, onEnableNotify, demo, onSpawnDemo }) {
+export default function SettingsSheet({ open, onClose, settings, update, profile, onEditProfile, onEnableNotify, onReplayTour, demo, onSpawnDemo }) {
   return (
     <Sheet open={open} onClose={onClose} title="Settings ⚙️">
       <button onClick={onEditProfile} className="mb-5 flex w-full items-center gap-3 rounded-2xl bg-black/5 p-3 text-left dark:bg-white/5">
@@ -66,6 +66,10 @@ export default function SettingsSheet({ open, onClose, settings, update, profile
           <button onClick={onEnableNotify} className="h-12 w-full rounded-2xl bg-neon-cyan font-bold text-ink-900">🔔 Enable notifications</button>
         )}
       </Row>
+
+      <button onClick={onReplayTour} className="mb-5 h-12 w-full rounded-2xl bg-black/5 font-semibold dark:bg-white/10">
+        🧭 Replay the app tour
+      </button>
 
       {demo && (
         <Row label="Demo tools 🧪">

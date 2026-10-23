@@ -8,6 +8,7 @@ import ProfileSetup from './components/ProfileSetup'
 import VibeCheck from './components/VibeCheck'
 import Toast from './components/Toast'
 import PlaceSearch from './components/PlaceSearch'
+import Tour from './components/Tour'
 import { backend } from './lib/backend'
 import { createT, randomCaption } from './lib/i18n'
 import { distanceM, formatDistance } from './lib/geo'
@@ -67,6 +68,7 @@ export default function App() {
   const [flyTarget, setFlyTarget] = useState(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchPin, setSearchPin] = useState(null)
+  const [tourOpen, setTourOpen] = useState(false)
 
   const say = useCallback((text, kind) => setToast({ text, kind, id: Date.now() }), [])
   const refreshProfile = useCallback(() => backend.getProfile().then(setProfile).catch(() => {}), [])
@@ -89,6 +91,12 @@ export default function App() {
     if (DEMO && geo.error && !fakePos) setFakePos(DEMO_FALLBACK)
   }, [geo.error, fakePos])
 
+  useEffect(() => {
+    if (!profile || editingProfile || settings.tourDone) return
+    const tm = setTimeout(() => setTourOpen(true), 1200)
+    return () => clearTimeout(tm)
+  }, [profile, editingProfile, settings.tourDone])
+
   const selected = checkpoints.find((c) => c.id === selectedId) || null
   useEffect(() => {
     if (selectedId && !selected) {
@@ -109,7 +117,7 @@ export default function App() {
   }, [settings.lang, settings.sound, settings.notify, t])
 
   const { markSeen } = useProximityAlerts({
-    pos, checkpoints, radius: settings.radius, enabled: !!profile, userId: profile?.id, onAlert,
+    pos, checkpoints, radius: settings.radius, enabled: !!profile && !tourOpen, userId: profile?.id, onAlert,
   })
 
   const openReport = () => {
@@ -235,7 +243,7 @@ export default function App() {
 
       {/* Top bar */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] flex items-start justify-between gap-2 px-3 safe-top">
-        <button onClick={() => setSettingsOpen(true)}
+        <button onClick={() => setSettingsOpen(true)} data-tour="profile"
           className="pointer-events-auto flex items-center gap-2 rounded-full bg-white/90 py-1.5 pl-1.5 pr-4 shadow-lg backdrop-blur dark:bg-ink-800/90">
           <span className="grid h-9 w-9 place-items-center rounded-full bg-neon-pink/20 text-xl">{profile.avatar}</span>
           <span className="text-left leading-tight">
@@ -247,12 +255,12 @@ export default function App() {
           <div className="rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold shadow backdrop-blur dark:bg-ink-800/90">
             {checkpoints.length} live {DEMO && <span className="ml-1 text-neon-pink">DEMO</span>}
           </div>
-          <button onClick={() => setSettingsOpen(true)} aria-label="Settings"
+          <button onClick={() => setSettingsOpen(true)} aria-label="Settings" data-tour="settings"
             className="grid h-12 w-12 place-items-center rounded-full bg-white/90 text-xl shadow-lg backdrop-blur dark:bg-ink-800/90">⚙️</button>
         </div>
       </div>
 
-      <button onClick={() => setSearchOpen(true)}
+      <button onClick={() => setSearchOpen(true)} data-tour="search"
         className="absolute inset-x-3 top-[calc(max(env(safe-area-inset-top),12px)+60px)] z-[500] flex h-12 items-center gap-2 rounded-full bg-white/90 px-4 text-left text-[15px] shadow-lg backdrop-blur dark:bg-ink-800/90">
         <span>🔍</span>
         <span className="opacity-60">Search a place to drop a pin</span>
@@ -270,7 +278,7 @@ export default function App() {
 
       {/* Bottom controls */}
       <div className="absolute inset-x-0 bottom-0 z-[500] flex items-end justify-between gap-3 px-4 safe-bottom">
-        <button onClick={() => setVibeOpen(true)} aria-label="Vibe check"
+        <button onClick={() => setVibeOpen(true)} aria-label="Vibe check" data-tour="vibe"
           className="grid h-14 w-14 place-items-center rounded-full bg-white/90 text-2xl shadow-lg backdrop-blur dark:bg-ink-800/90">🛡️</button>
         <div className={`relative flex-1 ${searchPin ? 'invisible' : ''}`}>
           {!settings.seenDriveReminder && !searchPin && (
@@ -278,12 +286,12 @@ export default function App() {
               🛑 Don’t use while driving — pull over first
             </div>
           )}
-          <button onClick={openReport}
+          <button onClick={openReport} data-tour="drop"
             className="h-16 w-full rounded-full bg-neon-pink text-xl font-bold text-white shadow-neon transition active:scale-95">
             {t('dropPin')}
           </button>
         </div>
-        <button onClick={() => setRecenterKey((k) => k + 1)} aria-label="Recenter"
+        <button onClick={() => setRecenterKey((k) => k + 1)} aria-label="Recenter" data-tour="recenter"
           className="grid h-14 w-14 place-items-center rounded-full bg-white/90 text-2xl shadow-lg backdrop-blur dark:bg-ink-800/90">🎯</button>
       </div>
 
@@ -344,6 +352,7 @@ export default function App() {
         profile={profile}
         onEditProfile={() => { setSettingsOpen(false); setEditingProfile(true) }}
         onEnableNotify={enableNotify}
+        onReplayTour={() => { setSettingsOpen(false); setRecenterKey((k) => k + 1); setTimeout(() => setTourOpen(true), 400) }}
         demo={DEMO}
         onSpawnDemo={() => {
           if (!pos) return say('Need a location first', 'error')
@@ -370,6 +379,12 @@ export default function App() {
           setSearchPin(place)
           setFlyTarget({ lat: place.lat, lng: place.lng, zoom: 17, raise: 0.1, k: Date.now() })
         }}
+      />
+      <Tour
+        open={tourOpen}
+        t={t}
+        username={profile.username}
+        onDone={() => { setTourOpen(false); update({ tourDone: true }) }}
       />
       <Toast toast={toast} onDone={() => setToast(null)} />
     </div>

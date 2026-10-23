@@ -38,5 +38,7 @@ body { @apply bg-slate-100 text-slate-900 dark:bg-ink-900 dark:text-white font-s
 .wiggle { animation: wiggle 1.2s ease-in-out infinite; }
 @keyframes wiggle { 0%,100% { transform: rotate(0); } 10% { transform: rotate(-3deg); } 20% { transform: rotate(3deg); } 30% { transform: rotate(0); } }
 
+.tour-card { animation: tour-in .25s cubic-bezier(.2,.9,.3,1) both; }
+@keyframes tour-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; } }
 .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 16px); }
 .safe-top { padding-top: max(env(safe-area-inset-top), 12px); }
