@@ -7,12 +7,20 @@ import { checkpointIcon, searchIcon, userIcon } from '../lib/pinIcon'
 const TILE_URL = import.meta.env.VITE_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 const FALLBACK_CENTER = [17.385, 78.4867] // Hyderabad
 
-function Events({ onLongPress, onTap }) {
-  useMapEvents({
+function Events({ onLongPress, onTap, onViewChange }) {
+  const map = useMapEvents({
     // Leaflet fires contextmenu for right-click and touch long-press.
     contextmenu: (e) => onLongPress({ lat: e.latlng.lat, lng: e.latlng.lng }),
     click: (e) => onTap?.({ lat: e.latlng.lat, lng: e.latlng.lng }),
+    moveend: () => {
+      const c = map.getCenter()
+      onViewChange?.({ lat: c.lat, lng: c.lng })
+    },
   })
+  useEffect(() => {
+    const c = map.getCenter()
+    onViewChange?.({ lat: c.lat, lng: c.lng })
+  }, [map]) // eslint-disable-line react-hooks/exhaustive-deps
   return null
 }
 
@@ -58,7 +66,7 @@ function CheckpointMarker({ cp, selected, onSelect, now }) {
   return <Marker position={[cp.lat, cp.lng]} icon={icon} eventHandlers={{ click: () => onSelect(cp) }} />
 }
 
-export default function MapView({ pos, accuracy, avatar, checkpoints, selectedId, onSelect, onLongPress, onTap, recenterKey, flyTarget, searchPin, onSearchPinMove, radius }) {
+export default function MapView({ pos, accuracy, avatar, checkpoints, selectedId, onSelect, onLongPress, onTap, recenterKey, flyTarget, searchPin, onSearchPinMove, onViewChange, radius }) {
   const [now, setNow] = useState(Date.now())
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 15000)
@@ -75,7 +83,7 @@ export default function MapView({ pos, accuracy, avatar, checkpoints, selectedId
       preferCanvas
     >
       <TileLayer url={TILE_URL} maxZoom={19} attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' />
-      <Events onLongPress={onLongPress} onTap={onTap} />
+      <Events onLongPress={onLongPress} onTap={onTap} onViewChange={onViewChange} />
       <Follow pos={pos} recenterKey={recenterKey} />
       <FlyTo target={flyTarget} />
       {pos && (

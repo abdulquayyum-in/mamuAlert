@@ -27,3 +27,24 @@ export function jitter({ lat, lng }, radius) {
     lng: lng + (r * Math.sin(t)) / (111320 * Math.cos((lat * Math.PI) / 180)),
   }
 }
+
+// Coarse region cells (must match public.naaka_region() in SQL).
+export const REGION_DEG = 0.25
+
+export function regionOf({ lat, lng }) {
+  return `r${Math.floor(lat / REGION_DEG)}_${Math.floor(lng / REGION_DEG)}`
+}
+
+// The 3×3 block of cells around a point (~80 km across at Indian latitudes).
+export function regionsAround({ lat, lng }) {
+  const i = Math.floor(lat / REGION_DEG)
+  const j = Math.floor(lng / REGION_DEG)
+  const out = []
+  for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) out.push(`r${i + di}_${j + dj}`)
+  return out
+}
+
+export function regionsAroundCell(cell) {
+  const [, i, j] = cell.match(/^r(-?\d+)_(-?\d+)$/)
+  return regionsAround({ lat: (Number(i) + 0.5) * REGION_DEG, lng: (Number(j) + 0.5) * REGION_DEG })
+}

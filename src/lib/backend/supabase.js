@@ -1,7 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
-import { AppError, fromPg } from './errors'
+import { fromAuth, fromPg } from './errors'
 import { isLive } from '../rules'
 
+const POLL_MS = 30000
 const COLUMNS = 'id,lat,lng,tag,note,emoji,created_by,reporter_name,reporter_avatar,created_at,expires_at,confirmations,gone_votes,status'
 
 export function createSupabaseBackend(url, anonKey) {
@@ -29,7 +30,7 @@ export function createSupabaseBackend(url, anonKey) {
         // Anonymous auth gives every device a stable user id for RLS + rate limiting.
         // Phone OTP / Google can later be linked to the same user (feature 9).
         const { data, error } = await sb.auth.signInAnonymously()
-        if (error) throw new AppError('auth_failed', { cause: error })
+        if (error) throw fromAuth(error)
         session = data.session
       }
       userId = session.user.id
@@ -48,7 +49,10 @@ export function createSupabaseBackend(url, anonKey) {
       return getProfile()
     },
 
-    subscribeCheckpoints(cb) {
+    // Loads and live-subscribes only to pins in `regions` (see regionsAround()).
+    // onStatus('live' | 'degraded') reports whether realtime is connected; while
+    // degraded (e.g. the project's realtime connection limit is hit) we poll instead.
+    subscribeCheckpoints(regions, cb, onStatus = () => {}) {
       const byId = new Map()
       const push = () => cb([...byId.values()].filter((cp) => isLive(cp)))
       const upsert = (row) => {
@@ -61,6 +65,7 @@ export function createSupabaseBackend(url, anonKey) {
         const { data, error } = await sb
           .from('checkpoints')
           .select(COLUMNS)
+          .in('region', regions)
           .eq('status', 'active')
           .gt('expires_at', new Date().toISOString())
         if (error) return console.warn('[naaka] load failed', error)
@@ -69,19 +74,44 @@ export function createSupabaseBackend(url, anonKey) {
         push()
       }
 
+      let poll = null
+      const startPolling = () => {
+        if (poll) return
+        onStatus('degraded')
+        load()
+        poll = setInterval(load, POLL_MS)
+      }
+      const stopPolling = () => {
+        clearInterval(poll)
+        poll = null
+        onStatus('live')
+      }
+
+      // No DELETE listener: deletes can't be filtered by region (they'd fan out to
+      // everyone). Pins are flipped to status 'expired' / 'cleared' (an UPDATE) well
+      // before the cleanup job deletes them, and the local tick hides expired ones.
+      const filter = `region=in.(${regions.join(',')})`
+      const onChange = (payload) => { upsert(payload.new); push() }
       const channel = sb
         // Unique name per subscription: supabase-js reuses channels by name, which breaks
         // a second subscriber (or React StrictMode's mount → unmount → mount).
-        .channel(`checkpoints-live-${crypto.randomUUID()}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'checkpoints' }, (payload) => {
-          if (payload.eventType === 'DELETE') byId.delete(payload.old.id)
-          else upsert(payload.new)
-          push()
+        .channel(`checkpoints-${crypto.randomUUID()}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'checkpoints', filter }, onChange)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'checkpoints', filter }, onChange)
+        .subscribe((status, err) => {
+          if (status === 'SUBSCRIBED') {
+            // Re-sync after (re)connecting so nothing is missed while offline.
+            stopPolling()
+            load()
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            // supabase-js keeps retrying the channel on its own; poll until it gets back in.
+            if (err) console.warn('[naaka] realtime', status, err.message)
+            startPolling()
+          }
         })
-        .subscribe((status) => {
-          // Re-sync after (re)connecting so nothing is missed while offline.
-          if (status === 'SUBSCRIBED') load()
-        })
+
+      // Show pins right away instead of waiting for the realtime join.
+      load()
 
       // Local expiry tick: pins disappear the moment expires_at passes,
       // without waiting for the server cron to flip their status.
@@ -91,6 +121,7 @@ export function createSupabaseBackend(url, anonKey) {
 
       return () => {
         clearInterval(tick)
+        clearInterval(poll)
         document.removeEventListener('visibilitychange', onVisible)
         sb.removeChannel(channel)
       }

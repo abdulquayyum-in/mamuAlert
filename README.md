@@ -33,6 +33,8 @@ With no Supabase keys, the app runs in **demo mode**:
 4. Run the SQL in order, either in the SQL editor or with `supabase db push` using the CLI:
    - `supabase/migrations/20261023000000_init.sql`: tables, PostGIS, RPCs, RLS, and the Realtime publication.
    - `supabase/migrations/20261023000100_cron.sql`: schedules `cleanup_checkpoints()` every minute.
+   - `supabase/migrations/20261024000000_fix_self_merge.sql`: stops re-reports of your own pin from earning points.
+   - `supabase/migrations/20261024010000_regions.sql`: adds the `region` column so clients only load and subscribe to nearby pins. **Run it before deploying any app version that uses regions.**
 5. Copy `.env.example` to `.env` and fill in the keys, then run `npm run dev`.
 
 ### Expiry job: pg_cron vs. Edge Function

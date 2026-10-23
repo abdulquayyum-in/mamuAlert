@@ -11,7 +11,7 @@ import PlaceSearch from './components/PlaceSearch'
 import Tour from './components/Tour'
 import { backend } from './lib/backend'
 import { createT, randomCaption } from './lib/i18n'
-import { distanceM, formatDistance } from './lib/geo'
+import { distanceM, formatDistance, regionOf, regionsAroundCell } from './lib/geo'
 import { vibeLevel } from './lib/rules'
 import { playAlert, unlockAudio, vibrate } from './lib/sound'
 import { renderShareCard, shareBlob } from './lib/shareCard'
@@ -32,8 +32,43 @@ function errorText(e) {
     case 'checkpoint_inactive': return 'That pin already expired 💨'
     case 'note_too_long': return 'Note max 80 chars, keep it short'
     case 'profile_required': return 'Set up your profile first'
+    case 'busy': return 'Server’s super busy rn 😅 try again in a few seconds'
+    case 'offline': return 'You look offline 📡 check your connection'
     default: return 'Something broke, try again 🙏'
   }
+}
+
+// Startup failure screen: explains what's going on and retries by itself with backoff.
+const RETRY_DELAYS = [5, 10, 20, 30, 60]
+function BootError({ error, attempt, onRetry }) {
+  const delay = RETRY_DELAYS[Math.min(attempt, RETRY_DELAYS.length - 1)]
+  const [left, setLeft] = useState(delay)
+  useEffect(() => {
+    setLeft(delay)
+    const tm = setInterval(() => setLeft((s) => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(tm)
+  }, [attempt, delay])
+  useEffect(() => {
+    if (left === 0) onRetry()
+  }, [left, onRetry])
+
+  const copy = {
+    busy: ['Too many people joining at once 😅', 'NaakaAlert is getting a lot of love right now. Hang tight, we’ll get you in.'],
+    offline: ['You look offline 📡', 'Check your mobile data or Wi-Fi.'],
+  }[error?.code] || ['Couldn’t connect 😭', 'Something went wrong reaching the server.']
+
+  return (
+    <div className="grid h-full place-items-center p-6 text-center">
+      <div className="max-w-xs">
+        <p className="text-2xl font-bold">{copy[0]}</p>
+        <p className="mt-2 opacity-70">{copy[1]}</p>
+        <p className="mt-4 text-sm font-semibold text-emerald-600 dark:text-neon-green" role="status">
+          <span className="inline-block animate-spin">⏳</span> Retrying in {left}s…
+        </p>
+        <button onClick={onRetry} className="mt-4 h-12 rounded-2xl bg-neon-pink px-6 font-bold text-white">Retry now</button>
+      </div>
+    </div>
+  )
 }
 
 async function notify(title, body, tag) {
@@ -53,6 +88,9 @@ export default function App() {
   const pos = fakePos || geo.pos
 
   const [boot, setBoot] = useState({ loading: true, error: null })
+  const [bootAttempt, setBootAttempt] = useState(0)
+  const [viewCenter, setViewCenter] = useState(null)
+  const [liveStatus, setLiveStatus] = useState('live')
   const [profile, setProfile] = useState(null)
   const [editingProfile, setEditingProfile] = useState(false)
   const [checkpoints, setCheckpoints] = useState([])
@@ -74,16 +112,34 @@ export default function App() {
   const refreshProfile = useCallback(() => backend.getProfile().then(setProfile).catch(() => {}), [])
 
   useEffect(() => {
+    let cancelled = false
     backend.init()
-      .then(({ profile }) => { setProfile(profile); setBoot({ loading: false, error: null }) })
-      .catch((error) => setBoot({ loading: false, error }))
+      .then(({ profile }) => { if (!cancelled) { setProfile(profile); setBoot({ loading: false, error: null }) } })
+      .catch((error) => { if (!cancelled) setBoot({ loading: false, error }) })
+    return () => { cancelled = true }
+  }, [bootAttempt])
+  const retryBoot = useCallback(() => {
+    setBoot({ loading: true, error: null })
+    setBootAttempt((n) => n + 1)
   }, [])
+
+  // Only load + live-subscribe to pins near you and near what the map is showing.
+  // Recomputed when either point moves into a different ~28 km cell, not on every GPS tick.
+  const posCell = pos ? regionOf(pos) : null
+  const viewCell = viewCenter ? regionOf(viewCenter) : null
+  const regionsKey = useMemo(() => {
+    const set = new Set([posCell, viewCell].filter(Boolean).flatMap(regionsAroundCell))
+    return [...set].sort().join(',')
+  }, [posCell, viewCell])
+
+  useEffect(() => {
+    if (boot.loading || boot.error || !regionsKey) return
+    return backend.subscribeCheckpoints(regionsKey.split(','), setCheckpoints, setLiveStatus)
+  }, [boot, regionsKey])
 
   useEffect(() => {
     if (boot.loading || boot.error) return
-    const unsub = backend.subscribeCheckpoints(setCheckpoints)
     backend.myVotes().then(setMyVotes)
-    return unsub
   }, [boot])
 
   // Demo mode without GPS (desktop, denied permission): drop "me" in Hyderabad.
@@ -202,15 +258,7 @@ export default function App() {
     return <div className="grid h-full place-items-center text-2xl font-bold"><span className="animate-pulse">🚨 Loading the naakas…</span></div>
   }
   if (boot.error) {
-    return (
-      <div className="grid h-full place-items-center p-6 text-center">
-        <div>
-          <p className="text-2xl font-bold">Couldn’t connect 😭</p>
-          <p className="mt-2 opacity-70">Check your connection (and that Anonymous sign-ins are enabled in Supabase).</p>
-          <button onClick={() => location.reload()} className="mt-4 h-12 rounded-2xl bg-neon-pink px-6 font-bold text-white">Retry</button>
-        </div>
-      </div>
-    )
+    return <BootError error={boot.error} attempt={bootAttempt} onRetry={retryBoot} />
   }
   if (!profile || editingProfile) {
     return (
@@ -236,6 +284,7 @@ export default function App() {
         onTap={DEMO && settings.walkMode ? setFakePos : undefined}
         recenterKey={recenterKey}
         flyTarget={flyTarget}
+        onViewChange={setViewCenter}
         searchPin={searchPin}
         onSearchPinMove={(ll) => setSearchPin((p) => ({ ...p, ...ll, moved: true }))}
         radius={settings.radius}
@@ -266,15 +315,22 @@ export default function App() {
         <span className="opacity-60">Search a place to drop a pin</span>
       </button>
 
-      {(geo.error || (DEMO && settings.walkMode)) && (
-        <div className="absolute inset-x-3 top-[calc(max(env(safe-area-inset-top),12px)+118px)] z-[500] rounded-2xl bg-neon-yellow px-3 py-2 text-center text-sm font-semibold text-ink-900 shadow">
-          {DEMO && settings.walkMode
-            ? '🚶 Walk mode: tap the map to move yourself'
-            : geo.error === 'denied'
-              ? `📍 Location blocked — ${DEMO ? 'using a demo spot' : 'enable it to report & get alerts'}`
-              : '📍 Can’t get your location right now'}
-        </div>
-      )}
+      <div className="pointer-events-none absolute inset-x-3 top-[calc(max(env(safe-area-inset-top),12px)+118px)] z-[500] flex flex-col gap-2">
+        {liveStatus === 'degraded' && (
+          <div className="rounded-2xl bg-white/95 px-3 py-2 text-center text-sm font-semibold shadow dark:bg-ink-700/95" role="status">
+            🐢 Live updates are busy rn — refreshing every 30s
+          </div>
+        )}
+        {(geo.error || (DEMO && settings.walkMode)) && (
+          <div className="rounded-2xl bg-neon-yellow px-3 py-2 text-center text-sm font-semibold text-ink-900 shadow">
+            {DEMO && settings.walkMode
+              ? '🚶 Walk mode: tap the map to move yourself'
+              : geo.error === 'denied'
+                ? `📍 Location blocked — ${DEMO ? 'using a demo spot' : 'enable it to report & get alerts'}`
+                : '📍 Can’t get your location right now'}
+          </div>
+        )}
+      </div>
 
       {/* Bottom controls */}
       <div className="absolute inset-x-0 bottom-0 z-[500] flex items-end justify-between gap-3 px-4 safe-bottom">

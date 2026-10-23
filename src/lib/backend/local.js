@@ -3,7 +3,7 @@
 // VITE_SUPABASE_URL is configured, so the app runs with zero setup.
 import { AppError } from './errors'
 import { load, save } from '../storage'
-import { distanceM, jitter } from '../geo'
+import { distanceM, jitter, regionOf } from '../geo'
 import {
   BASE_TTL_MS, GONE_THRESHOLD, MERGE_RADIUS_M, MIN, NOTE_MAX, RATE_LIMIT_MS, TAGS, expiryFor, isLive,
 } from '../rules'
@@ -14,7 +14,7 @@ const K_PROFILE = 'naaka.demo.profile'
 
 export function createLocalBackend() {
   const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('naaka-demo') : null
-  const listeners = new Set()
+  const listeners = new Map()
   let userId = load(K_USER, null)
   if (!userId) {
     userId = crypto.randomUUID()
@@ -22,10 +22,9 @@ export function createLocalBackend() {
   }
 
   const readAll = () => load(K_CP, [])
-  const emit = () => {
-    const live = readAll().filter((cp) => isLive(cp))
-    listeners.forEach((cb) => cb(live))
-  }
+  // listeners: Map<cb, Set<region>>. Mirrors the Supabase backend's region scoping.
+  const emitTo = (cb, regions) => cb(readAll().filter((cp) => isLive(cp) && regions.has(regionOf(cp))))
+  const emit = () => listeners.forEach((regions, cb) => emitTo(cb, regions))
   const writeAll = (list) => {
     save(K_CP, list)
     emit()
@@ -80,9 +79,11 @@ export function createLocalBackend() {
       return p
     },
 
-    subscribeCheckpoints(cb) {
-      listeners.add(cb)
-      cb(readAll().filter((cp) => isLive(cp)))
+    subscribeCheckpoints(regions, cb, onStatus = () => {}) {
+      const set = new Set(regions)
+      listeners.set(cb, set)
+      onStatus('live')
+      emitTo(cb, set)
       const t = setInterval(() => {
         const before = readAll()
         const after = purge(before)
