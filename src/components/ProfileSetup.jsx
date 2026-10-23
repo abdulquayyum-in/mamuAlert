@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ProductHuntBadge from './ProductHuntBadge'
 
 const AVATARS = ['😎', '🛵', '🦉', '🐸', '🤡', '👽', '🦊', '🐼', '🍗', '☕', '🛺', '🥷', '🐒', '💀', '🧢', '🫡']
 const A = ['Chai', 'Biryani', 'Gully', 'Turbo', 'Midnight', 'Sneaky', 'Desi', 'Nawabi', 'Chill', 'Masala']
@@ -57,6 +58,11 @@ export default function ProfileSetup({ initial, onSave, onCancel, demo }) {
           {busy ? 'Saving…' : initial ? 'Save' : 'Let’s gooo 🚀'}
         </button>
         {onCancel && <button onClick={onCancel} className="mt-2 h-12 w-full text-white/60">Cancel</button>}
+        {!initial && (
+          <div className="mt-6 flex justify-center">
+            <ProductHuntBadge theme="dark" />
+          </div>
+        )}
         {demo && !initial && (
           <p className="mt-4 text-center text-xs text-white/40">Offline demo mode — data stays in this browser. Add Supabase keys for real-time sync.</p>
         )}

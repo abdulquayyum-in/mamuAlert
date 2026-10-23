@@ -1,4 +1,5 @@
 import Sheet from './Sheet'
+import ProductHuntBadge from './ProductHuntBadge'
 import { VIBE_LANGS } from '../lib/i18n'
 import { SOUND_OPTIONS, playAlert, unlockAudio } from '../lib/sound'
 
@@ -82,6 +83,11 @@ export default function SettingsSheet({ open, onClose, settings, update, profile
           </div>
         </Row>
       )}
+
+      <div className="mb-4 flex flex-col items-center gap-2">
+        <span className="text-xs font-semibold opacity-60">Enjoying NaakaAlert? Show some love 🧡</span>
+        <ProductHuntBadge theme={settings.theme === 'light' ? 'light' : 'dark'} />
+      </div>
 
       <p className="pb-2 text-xs opacity-50">
         Your location stays on this device and is only used while the app is open. We never store your movement history.
