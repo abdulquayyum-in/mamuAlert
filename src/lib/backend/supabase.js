@@ -11,6 +11,8 @@ export function createSupabaseBackend(url, anonKey) {
     realtime: { params: { eventsPerSecond: 10 } },
   })
   let userId = null
+  // False until the regions migration has run; then we fall back to loading every pin.
+  let regionsReady = true
 
   async function getProfile() {
     if (!userId) return null
@@ -34,6 +36,11 @@ export function createSupabaseBackend(url, anonKey) {
         session = data.session
       }
       userId = session.user.id
+      // 20261024010000_regions.sql adds checkpoints.region. Until it has run on this
+      // database, keep the old load-everything behaviour so the map isn't empty.
+      const probe = await sb.from('checkpoints').select('region').limit(1)
+      regionsReady = probe.error?.code !== '42703'
+      if (!regionsReady) console.warn('[naaka] checkpoints.region missing: run the regions migration')
       return { userId, profile: await getProfile() }
     },
 
@@ -62,10 +69,9 @@ export function createSupabaseBackend(url, anonKey) {
       }
 
       const load = async () => {
-        const { data, error } = await sb
-          .from('checkpoints')
-          .select(COLUMNS)
-          .in('region', regions)
+        let q = sb.from('checkpoints').select(COLUMNS)
+        if (regionsReady) q = q.in('region', regions)
+        const { data, error } = await q
           .eq('status', 'active')
           .gt('expires_at', new Date().toISOString())
         if (error) return console.warn('[naaka] load failed', error)
@@ -90,15 +96,21 @@ export function createSupabaseBackend(url, anonKey) {
       // No DELETE listener: deletes can't be filtered by region (they'd fan out to
       // everyone). Pins are flipped to status 'expired' / 'cleared' (an UPDATE) well
       // before the cleanup job deletes them, and the local tick hides expired ones.
-      const filter = `region=in.(${regions.join(',')})`
+      const scope = regionsReady ? { filter: `region=in.(${regions.join(',')})` } : {}
       const onChange = (payload) => { upsert(payload.new); push() }
-      const channel = sb
-        // Unique name per subscription: supabase-js reuses channels by name, which breaks
-        // a second subscriber (or React StrictMode's mount → unmount → mount).
+      // Unique name per subscription: supabase-js reuses channels by name, which breaks
+      // a second subscriber (or React StrictMode's mount → unmount → mount).
+      let channel = sb
         .channel(`checkpoints-${crypto.randomUUID()}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'checkpoints', filter }, onChange)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'checkpoints', filter }, onChange)
-        .subscribe((status, err) => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'checkpoints', ...scope }, onChange)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'checkpoints', ...scope }, onChange)
+      if (!regionsReady) {
+        channel = channel.on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'checkpoints' }, (payload) => {
+          byId.delete(payload.old.id)
+          push()
+        })
+      }
+      channel = channel.subscribe((status, err) => {
           if (status === 'SUBSCRIBED') {
             // Re-sync after (re)connecting so nothing is missed while offline.
             stopPolling()

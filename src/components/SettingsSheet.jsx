@@ -87,6 +87,9 @@ export default function SettingsSheet({ open, onClose, settings, update, profile
       <div className="mb-4 flex flex-col items-center gap-2">
         <span className="text-xs font-semibold opacity-60">Enjoying NaakaAlert? Show some love 🧡</span>
         <ProductHuntBadge theme={settings.theme === 'light' ? 'light' : 'dark'} />
+        <span className="mt-1 text-center text-xs font-semibold opacity-60">
+          🛵 Made for fun, in free time · not affiliated with any police department
+        </span>
       </div>
 
       <p className="pb-2 text-xs opacity-50">

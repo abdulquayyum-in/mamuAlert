@@ -32,6 +32,11 @@ export default function ProfileSetup({ initial, onSave, onCancel, demo }) {
         <h1 className="text-3xl font-bold">
           {initial ? 'Edit your vibe' : <>Welcome to <span className="text-neon-pink">Naaka</span><span className="text-neon-green">Alert</span> 🚨</>}
         </h1>
+        {!initial && (
+          <span className="mt-3 inline-block rounded-full border border-neon-green/40 bg-neon-green/10 px-3 py-1 text-xs font-semibold text-neon-green">
+            🛵 Made for fun · a free side project
+          </span>
+        )}
         <p className="mt-2 text-white/70">
           Pick an anon name + avatar. That’s all anyone ever sees — never your phone or real name.
         </p>
